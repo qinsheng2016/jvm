@@ -9,6 +9,10 @@ import java.io.*;
  **/
 public class MyClassLoader extends ClassLoader {
 
+    MyClassLoader(){
+        super(new MyClassLoaderParent());
+    }
+
     @Override
     protected Class<?> findClass(String name) {
         File f = new File("F:/Temp/", name.replace(".", "/").concat(".class"));
@@ -44,13 +48,16 @@ public class MyClassLoader extends ClassLoader {
     public static void main(String[] args) {
 
         // todo ClassFormatError: Truncated class file
-        ClassLoader myClassLoader = new MyClassLoader();
-        try {
-            Class helloWorld = myClassLoader.loadClass("com.sqin.jvm.loader.HelloWorld");
-            System.out.println(helloWorld.getClassLoader());
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        }
+//        ClassLoader myClassLoader = new MyClassLoader();
+//        try {
+//            Class helloWorld = myClassLoader.loadClass("com.sqin.jvm.loader.HelloWorld");
+//            System.out.println(helloWorld.getClassLoader());
+//        } catch (ClassNotFoundException e) {
+//            e.printStackTrace();
+//        }
+
+        MyClassLoader myClassLoader = new MyClassLoader();
+        System.out.println(myClassLoader.getParent());
 
     }
 
