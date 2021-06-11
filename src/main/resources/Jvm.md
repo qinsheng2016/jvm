@@ -24,9 +24,6 @@
 package com.sqin.jvm.loader;
 
 /*
- * @Author Sheng Qin
- * @Description
- * @Date 19:28 2021/5/27
  * 测试Java中各种类由哪一个类加载器进行加载的
  **/
 public class ClassLoaderTest {
@@ -136,9 +133,6 @@ MyClassLoader(){
 package com.sqin.jvm.loader;
 
 /*
- * @Author Sheng Qin
- * @Description
- * @Date 22:10 2021/5/31
  * @Description 给静态成员变量赋默认值和初始值
  **/
 public class ClassLoaderProcedure {
@@ -176,3 +170,140 @@ class T {
 
 
 ## Java内存模型
+
+## 垃圾回收
+
+### 基础知识
+
+#### 一个对象的一生
+
+##### 栈上分配
+
+在栈上分配的对象用完后直接POP就结束一生了，一般这一块在JVM调优中不会调整。
+
+优点：速度快
+
+```md
+线程私有的小对象
+无逃逸（只在某一段代码中使用）见代码：
+支持标量替换，意思是用普通的属性，普通的类型代替对象
+```
+
+##### 本地分配
+
+TLAB（Thread Local Allocation Buffer）这一块也是属于Eden区，每个线程都独有一小块空间，一般为Eden区的1%，分配对象时不需要考虑到多线程的同步问题。
+
+实验：
+
+```java
+package com.sqin.jvm.gc;
+
+/*
+ * @description: 测试去掉逃逸分析，标量替换，TLAB后，执行速度的区别。
+ * -XX:-DoEscapeAnalysis
+ * -XX:-EliminateAllocations
+ * -XX:-UseTLAB
+ **/
+public class EscapeAnalysis {
+
+    class User {
+        int id;
+        String name;
+
+        public User(int id, String name) {
+            this.id = id;
+            this.name = name;
+        }
+    }
+
+    void alloc(int i) {
+        new User(i, "name " + i);	// 逃逸分析，标量替换
+    }
+
+    public static void main(String[] args) {
+        EscapeAnalysis ea = new EscapeAnalysis();
+        long start = System.currentTimeMillis();
+        for(int i=0; i<10000000; i++){
+            ea.alloc(i);
+        }
+        long end = System.currentTimeMillis();
+        System.out.println(end - start);
+    }
+
+
+}
+```
+
+
+
+##### 直接进入Old区
+
+如果这个对象特别大，直接进入Old区，FGC后才会结束。
+
+##### 进入Eden区
+
+分配到Eden区后，由GC清除，如果清除完成，则结束，如果没有清除进入s1，再进入s2，如此反复，在年龄够了后进入Old区，由FGC继续清除。
+
+
+
+#### 什么是垃圾
+
+没有任何引用指向的对象
+
+#### 如何定位垃圾
+
+1，引用计数，在对象的头上会有一个数字，表示有几个引用指向它，当数字为0时，对象就成了垃圾。缺点是解决不了循环依赖的问题。
+
+2，根可达算法，顺着根对象一直往下找，找到的对象标记起来，其他的全部是垃圾。
+
+根对象包括：
+
+线程栈变量：主程序就是Main线程栈中的变量调用了其他方法，main栈中的方法访问到的对象就是根对象
+
+静态变量：T.class对静态变量初始化，能够访问的对象
+
+常量池：如果一个class能够用到其他的class的对象
+
+JNI指针：本地方法，比如C++方法运行运用到了本地的对象
+
+#### 常见的垃圾回收算法
+
+1，标记清除 - 第一次扫描标记，第二次扫描清除，且清除后的内存不连续，碎片化
+
+2，拷贝算法 - 没有碎片，浪费空间
+
+3，标记压缩 - 没有碎片，效率低下（两遍扫描，还需要调整指针的指向）
+
+拷贝算法，适合存活对象较少的内存空间，新生代
+
+标记清除，标记压缩适合存活对象较多，老年代
+
+#### 常用垃圾回收器
+
+1，Serial + SerialOld 串行回收，单线程，最早时期的垃圾回收器，效率低下。
+
+2，Parallel Scavenge + Parallel Old 串行回收，多线程，比Serial提高了效率。
+
+3，ParNew + CMS 老年代并发执行，降低STW时间，ParNew就是在原来PS的基础上为了配合CMS做了改进
+
+PN以响应时间优先，PS吞吐量优先。
+
+4，G1
+
+5，ZGC
+
+### CMS(Concorrent mark sweep)
+
+CMS是一个里程碑式的东西，在它之前，所有的垃圾回收器在工作时，其他工作线程都不能干活。
+
+#### CMS四个阶段
+
+1，初始标记
+
+2，并发标记
+
+3，重新标记
+
+4，并发清除
+
+#### CMS缺点
