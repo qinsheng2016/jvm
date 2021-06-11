@@ -111,6 +111,54 @@ MyClassLoader(){
 
 #### LazyLoading
 
+```java
+package com.sqin.jvm.loader;
+
+/*
+ * @Author Sheng Qin
+ * @Description 需要这个类的时候，类才会被加载进内存
+ * @Date 0:37 2021/5/28
+ **/
+public class LazyLoading {
+
+    public static void main(String[] args) {
+        // 访问final值的时候，P类并没有到initializing
+//        System.out.println(P.i);
+
+        // 这里没有new，没有访问P类也不会被加载
+//        P p;
+
+        // 在访问类静态成员变量时，类已经被加载且initializing完成
+//        System.out.println(P.j);
+
+        try {
+            Class.forName("com.sqin.jvm.loader.LazyLoading$P");
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static class P {
+        final static int i = 9;
+        static int j = 8;
+        // 静态语句块会在initializing的步骤执行，只要P类被加载，P肯定会被打印
+        static {
+            System.out.println("P");
+        }
+    }
+
+    public static class X extends P {
+        static {
+            System.out.println("X");
+        }
+    }
+
+}
+
+```
+
+
+
 ### Linking
 
 #### Verification
@@ -165,11 +213,91 @@ class T {
 
 ```
 
-
-
-
-
 ## Java内存模型
+
+### 对象布局
+
+#### 普通对象
+
+##### 对象头
+
+8个字节，markword，里面包含了非常多的内容，主要是当前对象锁的情况，以及当前对象的垃圾回收的年龄。
+
+##### ClassPoint指针
+
+##### 实例数据
+
+##### Padding
+
+#### 数据对象
+
+##### 对象头
+
+##### ClassPoint指针
+
+##### 数组长度
+
+##### 数组数据
+
+##### 对齐,padding
+
+### 对象定位
+
+#### 句柄池
+
+#### 直接指针
+
+### 对象分配
+
+![image-20210601231313771](images/对象分配.png)
+
+## Java运行时数据区
+
+Java运行时数据区可以分为线程间共享和线程间隔离的
+
+1，线程间共享的内存区域包括Heap堆和Method Area方法区。
+
+2，线程间隔离的内存区域包括指令计数器Program counter，JVM Stacks（里面装的是栈帧，每个方法对应一个栈帧），Native method stacks
+
+解析以下一个简单的Java类：
+
+```java
+package com.sqin.jvm.jmm;
+
+/*
+ *
+ **/
+public class TestStack {
+
+    public static void main(String[] args) {
+        int i = 8;
+        i = i++;
+        System.out.println(i);
+    }
+}
+
+```
+
+```bash
+// 以下是main方法的字节码
+# bipush The immediate byte is sign-extended to an int value. That value is pushed onto the operand stack. 
+# istore_n The <n> must be an index into the local variable array of the current frame (§2.6). The value on the top of the operand stack must be of type int. It is popped from the operand stack, and the value of the local variable at <n> is set to value.
+# iload_n The <n> must be an index into the local variable array of the current frame (§2.6). The local variable at <n> must contain an int. The value of the local variable at <n> is pushed onto the operand stack.
+# iinc The index is an unsigned byte that must be an index into the local variable array of the current frame (§2.6). The const is an immediate signed byte. The local variable at index must contain an int. The value const is first sign-extended to an int, and then the local variable at index is incremented by that amount.
+ 0 bipush 8	# 把8压栈
+ 2 istore_1	# 把8赋给1位置的参数，这里就是i	到这里对应的是int i = 8;
+ 
+ 3 iload_1	# 把局部变量表1位置的参数i的值再放到栈中，就是8
+ 4 iinc 1 by 1	# 给本地变量表中1位置的数字+1，就是把i的值从8变成了9
+ 7 istore_1	# 把8赋给1位置的参数，这里就是i	到这里对应的是int i = 8;	到这里对应的是 i = i++;
+ 
+ 8 getstatic #2 <java/lang/System.out>
+11 iload_1	# 把局部变量表1位置的参数i的值再放到栈中，就是8
+12 invokevirtual #3 <java/io/PrintStream.println>	到这里对应的是打印
+15 return
+```
+
+
 
 ## 垃圾回收
 
